@@ -1,0 +1,38 @@
+#ifndef WEB_HANDLERS_H
+#define WEB_HANDLERS_H
+
+#include <Arduino.h>
+#include <WebServer.h>
+#include "config.h"
+
+extern WebServer server;
+
+// Web 页面处理
+void setNoCacheHeaders();
+void setCacheHeaders(int maxAge);
+bool checkAuth();
+void handleRoot();
+void handleStyleCss();  // CSS 独立路由
+void handleToolsPage();
+void handleQuery();
+void handleSendSms();
+void handlePing();
+void handleTimer();
+void handleSave();
+
+// 新功能
+void handleRestart();
+void handleSmsHistory();
+void handleStats();
+void handleFilterSave();
+void handleContentFilterSave();
+void handleAirplane();
+void handleSchedAirplane();
+
+// AT 命令
+String sendATCommand(const char* cmd, unsigned long timeout);
+bool sendATandWaitOK(const char* cmd, unsigned long timeout);
+bool waitCGATT1();
+void blink_short(unsigned long gap_time = 500);
+
+#endif

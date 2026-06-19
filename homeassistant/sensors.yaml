@@ -1,0 +1,156 @@
+# ===========================================
+# 短信转发器 Home Assistant 配置包
+# ===========================================
+# 
+# 使用方法（推荐使用 Packages 方式引入）：
+#
+# 1. 将此文件复制到 Home Assistant 配置目录
+#    例如：/config/packages/sms_forwarder.yaml
+#
+# 2. 在 configuration.yaml 中添加：
+#    homeassistant:
+#      packages:
+#        sms_forwarder: !include packages/sms_forwarder.yaml
+#
+# 3. 把下面的 "a1b2c3" 替换成你的设备 ID（在短信转发器网页查看）
+#
+# 4. 把 "sms" 替换成你设置的主题前缀（如果有修改的话）
+#
+# 5. 重启 Home Assistant
+#
+# ===========================================
+
+mqtt:
+  sensor:
+    # 设备在线状态
+    - name: "短信转发器状态"
+      unique_id: sms_forwarder_status
+      state_topic: "sms/a1b2c3/status"
+      value_template: "{{ value_json.status }}"
+      icon: mdi:message-text
+      
+    # WiFi 信号强度
+    - name: "短信转发器 WiFi 信号"
+      unique_id: sms_forwarder_wifi
+      state_topic: "sms/a1b2c3/status"
+      value_template: >-
+        {% set rssi = value_json.wifi_rssi | default(-999) | int(-999) %}
+        {% set status = value_json.wifi_status | default('未知') %}
+        {% if rssi == -999 %}未知
+        {% else %}{{ rssi }} dBm ({{ status }})
+        {% endif %}
+      icon: mdi:wifi
+      
+    # 4G 信号强度
+    - name: "短信转发器 4G 信号"
+      unique_id: sms_forwarder_lte
+      state_topic: "sms/a1b2c3/status"
+      value_template: >-
+        {% set rsrp = value_json.lte_rsrp | default(-999) | int(-999) %}
+        {% set status = value_json.lte_status | default('未知') %}
+        {% if rsrp == -999 %}未知
+        {% else %}{{ rsrp }} dBm ({{ status }})
+        {% endif %}
+      icon: mdi:signal-4g
+      
+    # APN
+    - name: "短信转发器 APN"
+      unique_id: sms_forwarder_apn
+      state_topic: "sms/a1b2c3/status"
+      value_template: "{{ value_json.apn | default('未知') }}"
+      icon: mdi:access-point-network
+      
+    # 设备 IP 地址
+    - name: "短信转发器 IP"
+      unique_id: sms_forwarder_ip
+      state_topic: "sms/a1b2c3/status"
+      value_template: "{{ value_json.ip }}"
+      icon: mdi:ip-network
+      
+    # 运行时间
+    - name: "短信转发器运行时间"
+      unique_id: sms_forwarder_uptime
+      state_topic: "sms/a1b2c3/status"
+      value_template: "{{ ((value_json.uptime | default(0) | int(0)) / 3600) | round(1) }}"
+      unit_of_measurement: "小时"
+      icon: mdi:clock-outline
+      
+    # 最近收到的短信 - 发送者
+    - name: "最近短信发送者"
+      unique_id: sms_forwarder_last_sender
+      state_topic: "sms/a1b2c3/sms/received"
+      value_template: "{{ value_json.sender }}"
+      icon: mdi:account
+      
+    # 最近收到的短信 - 内容
+    # 注意: 状态值有 255 字符限制，完整内容存储在 message 属性中
+    - name: "最近短信内容"
+      unique_id: sms_forwarder_last_message
+      state_topic: "sms/a1b2c3/sms/received"
+      value_template: >-
+        {% set msg = value_json.message | default('') %}
+        {% if msg | length > 50 %}
+          {{ msg[:50] }}...
+        {% else %}
+          {{ msg }}
+        {% endif %}
+      # 完整短信内容存储在属性中，支持换行显示
+      json_attributes_topic: "sms/a1b2c3/sms/received"
+      json_attributes_template: >-
+        {
+          "message": {{ value_json.message | default('') | tojson }},
+          "sender": {{ value_json.sender | default('') | tojson }},
+          "time": {{ value_json.time | default('') | tojson }}
+        }
+      icon: mdi:message-text
+      
+  # 二进制传感器 - 在线状态
+  binary_sensor:
+    - name: "短信转发器在线"
+      unique_id: sms_forwarder_online
+      state_topic: "sms/a1b2c3/status"
+      value_template: "{{ value_json.status }}"
+      payload_on: "online"
+      payload_off: "offline"
+      device_class: connectivity
+      icon: mdi:message-check
+
+  # 按钮 - 控制命令
+  button:
+    # 重启设备
+    - name: "短信转发器重启"
+      unique_id: sms_forwarder_restart
+      command_topic: "sms/a1b2c3/cmd"
+      payload_press: '{"action":"restart"}'
+      icon: mdi:restart
+
+# ===========================================
+# Lovelace 仪表板卡片配置示例
+# ===========================================
+
+# 短信内容显示卡片 (支持换行)
+# 使用 Markdown 卡片可以正确显示多行短信内容
+# 
+# type: markdown
+# title: 📱 最近短信
+# content: |
+#   **发送者:** {{ state_attr('sensor.zui_jin_duan_xin_nei_rong', 'sender') }}
+#   
+#   **时间:** {{ state_attr('sensor.zui_jin_duan_xin_nei_rong', 'time') }}
+#   
+#   ---
+#   
+#   {{ state_attr('sensor.zui_jin_duan_xin_nei_rong', 'message') }}
+
+# 模板传感器 - 短信详情（方便在 Markdown 卡片中显示）
+template:
+  - sensor:
+      - name: "短信详情"
+        unique_id: sms_forwarder_full_message
+        state: "{{ states('sensor.zui_jin_duan_xin_fa_song_zhe') }}"
+        attributes:
+          sender: "{{ state_attr('sensor.zui_jin_duan_xin_nei_rong', 'sender') }}"
+          time: "{{ state_attr('sensor.zui_jin_duan_xin_nei_rong', 'time') }}"
+          message: "{{ state_attr('sensor.zui_jin_duan_xin_nei_rong', 'message') }}"
+        icon: mdi:message-text-outline
+
